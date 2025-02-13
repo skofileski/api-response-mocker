@@ -1,0 +1,24 @@
+{
+	"name": "api-response-mocker",
+	"version": "1.0.0",
+	"description": "A lightweight library for creating mock API responses with realistic data generation",
+	"main": "src/index.js",
+	"type": "module",
+	"scripts": {
+		"test": "node --test",
+		"lint": "eslint src/",
+		"example": "node examples/basic-usage.js"
+	},
+	"keywords": [
+		"mock",
+		"api",
+		"testing",
+		"fake-data",
+		"development"
+	],
+	"author": "",
+	"license": "MIT",
+	"devDependencies": {
+		"eslint": "^8.56.0"
+	}
+}
