@@ -1,106 +1,66 @@
-import { FakeDataGenerator } from './generators.js';
-
 /**
- * API Response Mocker - Create configurable mock endpoints with realistic data
+ * API Response Mocker
+ * A lightweight library for creating mock API responses with realistic data generation
  */
-export class ApiMocker {
-	constructor(options = {}) {
-		this.endpoints = new Map();
-		this.defaultDelay = options.delay || 0;
-		this.generator = new FakeDataGenerator();
-	}
 
-	/**
-	 * Define a mock endpoint with a response schema
-	 * @param {string} method - HTTP method (GET, POST, etc.)
-	 * @param {string} path - Endpoint path
-	 * @param {object} schema - Response schema definition
-	 * @param {object} options - Endpoint-specific options
-	 */
-	define(method, path, schema, options = {}) {
-		const key = `${method.toUpperCase()}:${path}`;
-		this.endpoints.set(key, {
-			schema,
-			delay: options.delay ?? this.defaultDelay,
-			errorRate: options.errorRate || 0,
-			errorStatus: options.errorStatus || 500,
-			count: options.count || 1
-		});
-		return this;
-	}
+const generators = require('./generators');
+const { parseSchema, defineSchema } = require('./schema');
 
-	/**
-	 * Generate a response for a defined endpoint
-	 * @param {string} method - HTTP method
-	 * @param {string} path - Endpoint path
-	 * @returns {Promise<object>} Mock response
-	 */
-	async request(method, path) {
-		const key = `${method.toUpperCase()}:${path}`;
-		const endpoint = this.endpoints.get(key);
+class ApiResponseMocker {
+  constructor() {
+    this.endpoints = new Map();
+  }
 
-		if (!endpoint) {
-			return { status: 404, data: { error: 'Endpoint not found' } };
-		}
+  /**
+   * Define a mock endpoint
+   * @param {string} method - HTTP method (GET, POST, etc.)
+   * @param {string} path - URL path
+   * @param {Object} options - Endpoint configuration
+   */
+  define(method, path, options = {}) {
+    const key = `${method.toUpperCase()}:${path}`;
+    this.endpoints.set(key, {
+      method: method.toUpperCase(),
+      path,
+      schema: options.schema || null,
+      status: options.status || 200,
+      headers: options.headers || {},
+      ...options
+    });
+    return this;
+  }
 
-		// Simulate network delay
-		if (endpoint.delay > 0) {
-			await this._delay(endpoint.delay);
-		}
+  /**
+   * Generate response for a defined endpoint
+   * @param {string} method - HTTP method
+   * @param {string} path - URL path
+   * @returns {Object} Generated response
+   */
+  generate(method, path) {
+    const key = `${method.toUpperCase()}:${path}`;
+    const endpoint = this.endpoints.get(key);
 
-		// Simulate random errors
-		if (endpoint.errorRate > 0 && Math.random() < endpoint.errorRate) {
-			return {
-				status: endpoint.errorStatus,
-				data: { error: 'Simulated error' }
-			};
-		}
+    if (!endpoint) {
+      return {
+        status: 404,
+        body: { error: 'Endpoint not defined' },
+        headers: {}
+      };
+    }
 
-		// Generate response data
-		const data = endpoint.count > 1
-			? Array.from({ length: endpoint.count }, () => this._generateFromSchema(endpoint.schema))
-			: this._generateFromSchema(endpoint.schema);
+    const body = endpoint.schema ? parseSchema(endpoint.schema) : null;
 
-		return { status: 200, data };
-	}
-
-	/**
-	 * Generate data from a schema definition
-	 * @param {object} schema - Schema object
-	 * @returns {object} Generated data
-	 */
-	_generateFromSchema(schema) {
-		const result = {};
-
-		for (const [field, type] of Object.entries(schema)) {
-			if (typeof type === 'object' && !type._type) {
-				// Nested object
-				result[field] = this._generateFromSchema(type);
-			} else if (typeof type === 'object' && type._type) {
-				// Type with options
-				result[field] = this.generator.generate(type._type, type);
-			} else {
-				// Simple type string
-				result[field] = this.generator.generate(type);
-			}
-		}
-
-		return result;
-	}
-
-	/**
-	 * Promise-based delay helper
-	 * @param {number} ms - Milliseconds to delay
-	 */
-	_delay(ms) {
-		return new Promise(resolve => setTimeout(resolve, ms));
-	}
+    return {
+      status: endpoint.status,
+      body,
+      headers: endpoint.headers
+    };
+  }
 }
 
-// Export generators for direct use
-export { FakeDataGenerator } from './generators.js';
-
-// Convenience factory function
-export function createMocker(options) {
-	return new ApiMocker(options);
-}
+module.exports = {
+  ApiResponseMocker,
+  generators,
+  defineSchema,
+  parseSchema
+};
