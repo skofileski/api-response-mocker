@@ -1,119 +1,166 @@
 /**
- * Schema Parser Module
- * Provides a simple DSL for defining mock response schemas
+ * Schema parser and validator for mock API responses
  */
 
 const generators = require('./generators');
 
-/**
- * Parses a schema definition and generates mock data
- * @param {Object} schema - The schema definition object
- * @returns {Object} Generated mock data matching the schema
- */
-function parseSchema(schema) {
-  if (schema === null || schema === undefined) {
-    return null;
-  }
-
-  if (typeof schema === 'string') {
-    return resolveGenerator(schema);
-  }
-
-  if (Array.isArray(schema)) {
-    return parseArraySchema(schema);
-  }
-
-  if (typeof schema === 'object') {
-    return parseObjectSchema(schema);
-  }
-
-  return schema;
-}
-
-/**
- * Resolves a generator string to actual generated data
- * @param {string} generatorString - Generator identifier (e.g., 'name', 'email')
- * @returns {*} Generated value
- */
-function resolveGenerator(generatorString) {
-  // Check if it's a generator reference (prefixed with @)
-  if (generatorString.startsWith('@')) {
-    const generatorName = generatorString.slice(1);
-    const [type, ...args] = generatorName.split(':');
-    
-    if (generators[type]) {
-      return generators[type](...args);
+class Schema {
+  constructor(definition) {
+    if (!definition || typeof definition !== 'object') {
+      throw new Error('Schema definition must be a non-null object');
     }
-    
-    throw new Error(`Unknown generator: ${type}`);
+    this.definition = definition;
   }
-  
-  // Return literal string value
-  return generatorString;
+
+  generate() {
+    return this.processValue(this.definition);
+  }
+
+  processValue(value) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      return this.processStringValue(value);
+    }
+
+    if (Array.isArray(value)) {
+      return this.processArray(value);
+    }
+
+    if (typeof value === 'object') {
+      return this.processObject(value);
+    }
+
+    return value;
+  }
+
+  processStringValue(value) {
+    const generatorPattern = /^\{\{\s*(\w+)(?:\((.*?)\))?\s*\}\}$/;
+    const match = value.match(generatorPattern);
+
+    if (match) {
+      const [, generatorName, argsString] = match;
+      const args = argsString ? this.parseArgs(argsString) : [];
+      return this.callGenerator(generatorName, args);
+    }
+
+    return value;
+  }
+
+  parseArgs(argsString) {
+    if (!argsString || argsString.trim() === '') {
+      return [];
+    }
+
+    const args = [];
+    let current = '';
+    let inString = false;
+    let stringChar = null;
+    let depth = 0;
+
+    for (let i = 0; i < argsString.length; i++) {
+      const char = argsString[i];
+
+      if (!inString && (char === '"' || char === "'")) {
+        inString = true;
+        stringChar = char;
+        current += char;
+      } else if (inString && char === stringChar && argsString[i - 1] !== '\\') {
+        inString = false;
+        stringChar = null;
+        current += char;
+      } else if (!inString && (char === '[' || char === '{')) {
+        depth++;
+        current += char;
+      } else if (!inString && (char === ']' || char === '}')) {
+        depth--;
+        current += char;
+      } else if (!inString && depth === 0 && char === ',') {
+        args.push(this.parseArgValue(current.trim()));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+
+    if (current.trim()) {
+      args.push(this.parseArgValue(current.trim()));
+    }
+
+    return args;
+  }
+
+  parseArgValue(value) {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    if (value === 'null') return null;
+    if (value === 'undefined') return undefined;
+
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      return value.slice(1, -1);
+    }
+
+    const num = Number(value);
+    if (!isNaN(num) && value !== '') {
+      return num;
+    }
+
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+
+  callGenerator(name, args) {
+    const generatorFn = generators[name];
+
+    if (typeof generatorFn !== 'function') {
+      console.warn(`Unknown generator: ${name}, returning null`);
+      return null;
+    }
+
+    try {
+      return generatorFn(...args);
+    } catch (error) {
+      console.warn(`Generator ${name} failed: ${error.message}, returning null`);
+      return null;
+    }
+  }
+
+  processArray(arr) {
+    if (arr.length === 0) {
+      return [];
+    }
+    return arr.map(item => this.processValue(item));
+  }
+
+  processObject(obj) {
+    if (obj === null) {
+      return null;
+    }
+
+    if (obj._repeat && obj._template) {
+      const count = typeof obj._repeat === 'number' && obj._repeat > 0 ? obj._repeat : 1;
+      return Array.from({ length: count }, () => this.processValue(obj._template));
+    }
+
+    const result = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (key === undefined || value === undefined) {
+        continue;
+      }
+      result[key] = this.processValue(value);
+    }
+    return result;
+  }
 }
 
-/**
- * Parses an array schema definition
- * @param {Array} schema - Array schema definition
- * @returns {Array} Generated array
- */
-function parseArraySchema(schema) {
-  if (schema.length === 0) {
-    return [];
-  }
-
-  // First element defines the item schema
-  // Second element (optional) defines count or range
-  const itemSchema = schema[0];
-  const countConfig = schema[1] || 1;
-  
-  let count;
-  if (typeof countConfig === 'number') {
-    count = countConfig;
-  } else if (typeof countConfig === 'object' && countConfig.min !== undefined) {
-    const min = countConfig.min || 1;
-    const max = countConfig.max || 10;
-    count = Math.floor(Math.random() * (max - min + 1)) + min;
-  } else {
-    count = 1;
-  }
-
-  const result = [];
-  for (let i = 0; i < count; i++) {
-    result.push(parseSchema(itemSchema));
-  }
-  
-  return result;
+function createSchema(definition) {
+  return new Schema(definition);
 }
 
-/**
- * Parses an object schema definition
- * @param {Object} schema - Object schema definition
- * @returns {Object} Generated object
- */
-function parseObjectSchema(schema) {
-  const result = {};
-  
-  for (const [key, value] of Object.entries(schema)) {
-    result[key] = parseSchema(value);
-  }
-  
-  return result;
-}
-
-/**
- * Creates a reusable schema definition
- * @param {Object} definition - Schema definition object
- * @returns {Function} Function that generates data from the schema
- */
-function defineSchema(definition) {
-  return function generate() {
-    return parseSchema(definition);
-  };
-}
-
-module.exports = {
-  parseSchema,
-  defineSchema,
-  resolveGenerator
-};
+module.exports = { Schema, createSchema };
