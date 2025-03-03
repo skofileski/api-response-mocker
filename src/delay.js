@@ -1,77 +1,71 @@
 /**
- * Delay and timing utilities for simulating network latency
+ * @fileoverview Response delay utilities for simulating network latency
+ * @module delay
  */
 
 /**
- * Creates a promise that resolves after specified milliseconds
- * @param {number} ms - Milliseconds to delay
- * @returns {Promise<void>}
+ * Creates a promise that resolves after a specified delay
+ * @param {number} ms - Delay in milliseconds
+ * @returns {Promise<void>} Promise that resolves after the delay
+ * @example
+ * await delay(1000); // Wait 1 second
  */
 function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  if (typeof ms !== 'number' || ms < 0) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * Creates a delay within a random range
- * @param {number} min - Minimum delay in ms
- * @param {number} max - Maximum delay in ms
- * @returns {Promise<void>}
+ * Creates a random delay within a specified range
+ * @param {number} min - Minimum delay in milliseconds
+ * @param {number} max - Maximum delay in milliseconds
+ * @returns {Promise<void>} Promise that resolves after a random delay
+ * @example
+ * await randomDelay(100, 500); // Wait between 100-500ms
  */
 function randomDelay(min, max) {
+  if (typeof min !== 'number' || typeof max !== 'number') {
+    return Promise.resolve();
+  }
   const ms = Math.floor(Math.random() * (max - min + 1)) + min;
   return delay(ms);
 }
 
 /**
- * Delay configuration presets for common scenarios
+ * @typedef {Object} DelayConfig
+ * @property {number} [fixed] - Fixed delay in milliseconds
+ * @property {number} [min] - Minimum delay for random range
+ * @property {number} [max] - Maximum delay for random range
  */
-const DelayPresets = {
-  INSTANT: 0,
-  FAST: 50,
-  NORMAL: 200,
-  SLOW: 1000,
-  VERY_SLOW: 3000,
-  TIMEOUT: 30000
-};
 
 /**
- * Creates a delay function based on configuration
- * @param {Object|number} config - Delay configuration
- * @param {number} [config.fixed] - Fixed delay in ms
- * @param {number} [config.min] - Minimum random delay
- * @param {number} [config.max] - Maximum random delay
- * @param {string} [config.preset] - Preset name from DelayPresets
- * @returns {Function} Async function that applies the delay
+ * Creates a delay based on a configuration object
+ * @param {DelayConfig} config - Delay configuration
+ * @returns {Promise<void>} Promise that resolves after the configured delay
+ * @example
+ * await configuredDelay({ fixed: 200 });
+ * await configuredDelay({ min: 100, max: 500 });
  */
-function createDelayFn(config) {
-  if (typeof config === 'number') {
-    return () => delay(config);
+function configuredDelay(config) {
+  if (!config || typeof config !== 'object') {
+    return Promise.resolve();
   }
 
-  if (typeof config === 'string' && DelayPresets[config] !== undefined) {
-    return () => delay(DelayPresets[config]);
+  if (typeof config.fixed === 'number') {
+    return delay(config.fixed);
   }
 
-  if (config && typeof config === 'object') {
-    if (config.preset && DelayPresets[config.preset] !== undefined) {
-      return () => delay(DelayPresets[config.preset]);
-    }
-
-    if (config.fixed !== undefined) {
-      return () => delay(config.fixed);
-    }
-
-    if (config.min !== undefined && config.max !== undefined) {
-      return () => randomDelay(config.min, config.max);
-    }
+  if (typeof config.min === 'number' && typeof config.max === 'number') {
+    return randomDelay(config.min, config.max);
   }
 
-  return () => Promise.resolve();
+  return Promise.resolve();
 }
 
 module.exports = {
   delay,
   randomDelay,
-  DelayPresets,
-  createDelayFn
+  configuredDelay
 };

@@ -1,19 +1,14 @@
 /**
- * Built-in fake data generators for common types
+ * @fileoverview Built-in fake data generators for common types
+ * @module generators
  */
 
-const firstNames = ['James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda', 'William', 'Elizabeth'];
-const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
-const domains = ['example.com', 'test.org', 'demo.net', 'sample.io', 'mock.dev'];
-const loremWords = ['lorem', 'ipsum', 'dolor', 'sit', 'amet', 'consectetur', 'adipiscing', 'elit', 'sed', 'do', 'eiusmod', 'tempor', 'incididunt', 'ut', 'labore', 'et', 'dolore', 'magna', 'aliqua'];
-
-function randomItem(array) {
-  if (!Array.isArray(array) || array.length === 0) {
-    return null;
-  }
-  return array[Math.floor(Math.random() * array.length)];
-}
-
+/**
+ * Generates a random UUID v4
+ * @returns {string} A random UUID
+ * @example
+ * uuid() // => '550e8400-e29b-41d4-a716-446655440000'
+ */
 function uuid() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
@@ -22,152 +17,188 @@ function uuid() {
   });
 }
 
+const firstNames = ['John', 'Jane', 'Michael', 'Sarah', 'David', 'Emily', 'Chris', 'Amanda', 'Robert', 'Lisa'];
+const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Martinez', 'Wilson'];
+const domains = ['example.com', 'test.org', 'mock.io', 'fake.net', 'sample.co'];
+
+/**
+ * Generates a random first name
+ * @returns {string} A random first name
+ * @example
+ * firstName() // => 'John'
+ */
 function firstName() {
-  return randomItem(firstNames) || 'John';
+  return firstNames[Math.floor(Math.random() * firstNames.length)];
 }
 
+/**
+ * Generates a random last name
+ * @returns {string} A random last name
+ * @example
+ * lastName() // => 'Smith'
+ */
 function lastName() {
-  return randomItem(lastNames) || 'Doe';
+  return lastNames[Math.floor(Math.random() * lastNames.length)];
 }
 
+/**
+ * Generates a random full name
+ * @returns {string} A random full name
+ * @example
+ * fullName() // => 'John Smith'
+ */
 function fullName() {
   return `${firstName()} ${lastName()}`;
 }
 
-function email(domain) {
-  const fn = firstName().toLowerCase();
-  const ln = lastName().toLowerCase();
-  const d = domain || randomItem(domains) || 'example.com';
-  return `${fn}.${ln}@${d}`;
+/**
+ * Generates a random email address
+ * @returns {string} A random email address
+ * @example
+ * email() // => 'john.smith42@example.com'
+ */
+function email() {
+  const first = firstName().toLowerCase();
+  const last = lastName().toLowerCase();
+  const domain = domains[Math.floor(Math.random() * domains.length)];
+  const num = Math.floor(Math.random() * 100);
+  return `${first}.${last}${num}@${domain}`;
 }
 
+/**
+ * Generates a random date within a range
+ * @param {Date} [start=new Date(2020, 0, 1)] - Start date
+ * @param {Date} [end=new Date()] - End date
+ * @returns {Date} A random date between start and end
+ * @example
+ * date(new Date(2023, 0, 1), new Date(2023, 11, 31))
+ */
+function date(start = new Date(2020, 0, 1), end = new Date()) {
+  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+}
+
+/**
+ * Generates a random ISO date string
+ * @returns {string} A random ISO date string
+ * @example
+ * isoDate() // => '2023-06-15T10:30:00.000Z'
+ */
+function isoDate() {
+  return date().toISOString();
+}
+
+/**
+ * Generates a random integer within a range
+ * @param {number} [min=0] - Minimum value (inclusive)
+ * @param {number} [max=1000] - Maximum value (inclusive)
+ * @returns {number} A random integer
+ * @example
+ * integer(1, 100) // => 42
+ */
 function integer(min = 0, max = 1000) {
-  const minVal = typeof min === 'number' && !isNaN(min) ? Math.floor(min) : 0;
-  const maxVal = typeof max === 'number' && !isNaN(max) ? Math.floor(max) : 1000;
-  const actualMin = Math.min(minVal, maxVal);
-  const actualMax = Math.max(minVal, maxVal);
-  return Math.floor(Math.random() * (actualMax - actualMin + 1)) + actualMin;
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+/**
+ * Generates a random floating-point number
+ * @param {number} [min=0] - Minimum value
+ * @param {number} [max=1000] - Maximum value
+ * @param {number} [decimals=2] - Number of decimal places
+ * @returns {number} A random float
+ * @example
+ * float(0, 100, 2) // => 42.57
+ */
 function float(min = 0, max = 1000, decimals = 2) {
-  const minVal = typeof min === 'number' && !isNaN(min) ? min : 0;
-  const maxVal = typeof max === 'number' && !isNaN(max) ? max : 1000;
-  const decVal = typeof decimals === 'number' && !isNaN(decimals) && decimals >= 0 ? decimals : 2;
-  const actualMin = Math.min(minVal, maxVal);
-  const actualMax = Math.max(minVal, maxVal);
-  const value = Math.random() * (actualMax - actualMin) + actualMin;
-  return parseFloat(value.toFixed(decVal));
+  const num = Math.random() * (max - min) + min;
+  return parseFloat(num.toFixed(decimals));
 }
 
-function boolean() {
-  return Math.random() > 0.5;
+/**
+ * Generates a random boolean
+ * @param {number} [probability=0.5] - Probability of true (0-1)
+ * @returns {boolean} A random boolean
+ * @example
+ * boolean(0.7) // => true (70% chance)
+ */
+function boolean(probability = 0.5) {
+  return Math.random() < probability;
 }
 
-function date(startYear = 2020, endYear = 2024) {
-  const start = typeof startYear === 'number' && !isNaN(startYear) ? startYear : 2020;
-  const end = typeof endYear === 'number' && !isNaN(endYear) ? endYear : 2024;
-  const actualStart = Math.min(start, end);
-  const actualEnd = Math.max(start, end);
-  const startDate = new Date(actualStart, 0, 1);
-  const endDate = new Date(actualEnd, 11, 31);
-  const timestamp = startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime());
-  return new Date(timestamp).toISOString().split('T')[0];
-}
-
-function datetime(startYear = 2020, endYear = 2024) {
-  const start = typeof startYear === 'number' && !isNaN(startYear) ? startYear : 2020;
-  const end = typeof endYear === 'number' && !isNaN(endYear) ? endYear : 2024;
-  const actualStart = Math.min(start, end);
-  const actualEnd = Math.max(start, end);
-  const startDate = new Date(actualStart, 0, 1);
-  const endDate = new Date(actualEnd, 11, 31);
-  const timestamp = startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime());
-  return new Date(timestamp).toISOString();
-}
-
-function timestamp() {
-  return Date.now();
-}
-
-function lorem(wordCount = 10) {
-  const count = typeof wordCount === 'number' && !isNaN(wordCount) && wordCount > 0 ? wordCount : 10;
-  const words = [];
-  for (let i = 0; i < count; i++) {
-    words.push(randomItem(loremWords) || 'lorem');
-  }
-  return words.join(' ');
-}
-
-function paragraph(sentenceCount = 3) {
-  const count = typeof sentenceCount === 'number' && !isNaN(sentenceCount) && sentenceCount > 0 ? sentenceCount : 3;
-  const sentences = [];
-  for (let i = 0; i < count; i++) {
-    const wordCount = integer(8, 15);
-    let sentence = lorem(wordCount);
-    sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1) + '.';
-    sentences.push(sentence);
-  }
-  return sentences.join(' ');
-}
-
-function phone() {
-  const areaCode = integer(200, 999);
-  const prefix = integer(200, 999);
-  const line = integer(1000, 9999);
-  return `(${areaCode}) ${prefix}-${line}`;
-}
-
-function url(protocol = 'https') {
-  const proto = typeof protocol === 'string' && protocol ? protocol : 'https';
-  const domain = randomItem(domains) || 'example.com';
-  const path = lorem(2).toLowerCase().replace(/\s+/g, '-');
-  return `${proto}://${domain}/${path}`;
-}
-
-function pick(options) {
-  if (!Array.isArray(options) || options.length === 0) {
+/**
+ * Picks a random element from an array
+ * @param {Array} arr - Array to pick from
+ * @returns {*} A random element from the array
+ * @example
+ * oneOf(['apple', 'banana', 'cherry']) // => 'banana'
+ */
+function oneOf(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) {
     return null;
   }
-  return randomItem(options);
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function sequence(name = 'default') {
-  if (!sequence.counters) {
-    sequence.counters = {};
-  }
-  const key = String(name);
-  if (!sequence.counters[key]) {
-    sequence.counters[key] = 0;
-  }
-  return ++sequence.counters[key];
+/**
+ * Generates a random phone number
+ * @returns {string} A random phone number
+ * @example
+ * phone() // => '+1-555-123-4567'
+ */
+function phone() {
+  const areaCode = integer(100, 999);
+  const prefix = integer(100, 999);
+  const line = integer(1000, 9999);
+  return `+1-${areaCode}-${prefix}-${line}`;
 }
 
-sequence.reset = function(name) {
-  if (!sequence.counters) return;
-  if (name) {
-    delete sequence.counters[String(name)];
-  } else {
-    sequence.counters = {};
+/**
+ * Generates Lorem Ipsum text
+ * @param {number} [words=10] - Number of words to generate
+ * @returns {string} Lorem ipsum text
+ * @example
+ * lorem(5) // => 'Lorem ipsum dolor sit amet'
+ */
+function lorem(words = 10) {
+  const loremWords = [
+    'lorem', 'ipsum', 'dolor', 'sit', 'amet', 'consectetur',
+    'adipiscing', 'elit', 'sed', 'do', 'eiusmod', 'tempor',
+    'incididunt', 'ut', 'labore', 'et', 'dolore', 'magna', 'aliqua'
+  ];
+  const result = [];
+  for (let i = 0; i < words; i++) {
+    result.push(loremWords[i % loremWords.length]);
   }
-};
+  return result.join(' ');
+}
 
-module.exports = {
+/**
+ * Generates a random URL
+ * @returns {string} A random URL
+ * @example
+ * url() // => 'https://example.com/path/abc123'
+ */
+function url() {
+  const domain = domains[Math.floor(Math.random() * domains.length)];
+  const path = Math.random().toString(36).substring(7);
+  return `https://${domain}/path/${path}`;
+}
+
+/** @type {Object.<string, Function>} */
+const generators = {
   uuid,
   firstName,
   lastName,
   fullName,
   email,
+  date,
+  isoDate,
   integer,
   float,
   boolean,
-  date,
-  datetime,
-  timestamp,
-  lorem,
-  paragraph,
+  oneOf,
   phone,
-  url,
-  pick,
-  sequence,
-  randomItem
+  lorem,
+  url
 };
+
+module.exports = { generators };
