@@ -1,149 +1,106 @@
 /**
- * @fileoverview Error simulation utilities for testing error handling
+ * @fileoverview Error simulation utilities for testing edge cases
  * @module errors
  */
 
 /**
- * @typedef {Object} MockError
- * @property {number} status - HTTP status code
- * @property {string} message - Error message
- * @property {string} [code] - Error code
- * @property {Object} [details] - Additional error details
+ * Standard HTTP error definitions
+ * @type {Object.<number, {status: number, message: string}>}
  */
-
-/**
- * Common HTTP error definitions
- * @type {Object.<string, MockError>}
- */
-const commonErrors = {
-  badRequest: {
-    status: 400,
-    message: 'Bad Request',
-    code: 'BAD_REQUEST'
-  },
-  unauthorized: {
-    status: 401,
-    message: 'Unauthorized',
-    code: 'UNAUTHORIZED'
-  },
-  forbidden: {
-    status: 403,
-    message: 'Forbidden',
-    code: 'FORBIDDEN'
-  },
-  notFound: {
-    status: 404,
-    message: 'Not Found',
-    code: 'NOT_FOUND'
-  },
-  methodNotAllowed: {
-    status: 405,
-    message: 'Method Not Allowed',
-    code: 'METHOD_NOT_ALLOWED'
-  },
-  conflict: {
-    status: 409,
-    message: 'Conflict',
-    code: 'CONFLICT'
-  },
-  unprocessableEntity: {
-    status: 422,
-    message: 'Unprocessable Entity',
-    code: 'UNPROCESSABLE_ENTITY'
-  },
-  tooManyRequests: {
-    status: 429,
-    message: 'Too Many Requests',
-    code: 'TOO_MANY_REQUESTS'
-  },
-  internalServer: {
-    status: 500,
-    message: 'Internal Server Error',
-    code: 'INTERNAL_ERROR'
-  },
-  badGateway: {
-    status: 502,
-    message: 'Bad Gateway',
-    code: 'BAD_GATEWAY'
-  },
-  serviceUnavailable: {
-    status: 503,
-    message: 'Service Unavailable',
-    code: 'SERVICE_UNAVAILABLE'
-  },
-  gatewayTimeout: {
-    status: 504,
-    message: 'Gateway Timeout',
-    code: 'GATEWAY_TIMEOUT'
-  }
+const HTTP_ERRORS = {
+  400: { status: 400, message: 'Bad Request' },
+  401: { status: 401, message: 'Unauthorized' },
+  403: { status: 403, message: 'Forbidden' },
+  404: { status: 404, message: 'Not Found' },
+  405: { status: 405, message: 'Method Not Allowed' },
+  408: { status: 408, message: 'Request Timeout' },
+  409: { status: 409, message: 'Conflict' },
+  422: { status: 422, message: 'Unprocessable Entity' },
+  429: { status: 429, message: 'Too Many Requests' },
+  500: { status: 500, message: 'Internal Server Error' },
+  502: { status: 502, message: 'Bad Gateway' },
+  503: { status: 503, message: 'Service Unavailable' },
+  504: { status: 504, message: 'Gateway Timeout' },
 };
 
 /**
- * Creates a custom mock error
- * @param {number} status - HTTP status code
- * @param {string} message - Error message
- * @param {Object} [options] - Additional options
- * @param {string} [options.code] - Error code
- * @param {Object} [options.details] - Additional details
- * @returns {MockError} The mock error object
- * @example
- * const error = createError(400, 'Invalid email format', {
- *   code: 'VALIDATION_ERROR',
- *   details: { field: 'email' }
- * });
+ * Custom error class for mock API errors
+ * @extends Error
  */
-function createError(status, message, options = {}) {
-  return {
-    status,
-    message,
-    code: options.code || 'ERROR',
-    ...(options.details && { details: options.details })
+class MockApiError extends Error {
+  /**
+   * Create a MockApiError
+   * @param {number} status - HTTP status code
+   * @param {string} [message] - Error message
+   * @param {Object} [details] - Additional error details
+   */
+  constructor(status, message, details = {}) {
+    const httpError = HTTP_ERRORS[status] || { status, message: 'Unknown Error' };
+    super(message || httpError.message);
+
+    this.name = 'MockApiError';
+    this.status = status;
+    this.details = details;
+  }
+
+  /**
+   * Convert error to JSON response format
+   * @returns {Object} JSON representation of error
+   */
+  toJSON() {
+    return {
+      error: {
+        status: this.status,
+        message: this.message,
+        ...this.details,
+      },
+    };
+  }
+}
+
+/**
+ * Create an error simulator based on configuration
+ * @param {Object} config - Error simulation configuration
+ * @param {number} [config.rate=0] - Error rate (0-1)
+ * @param {number|number[]} [config.status=500] - Status code(s) to return
+ * @returns {Function} Error simulator function
+ */
+function createErrorSimulator(config = {}) {
+  const { rate = 0, status = 500 } = config;
+
+  return () => {
+    if (Math.random() < rate) {
+      const errorStatus = Array.isArray(status)
+        ? status[Math.floor(Math.random() * status.length)]
+        : status;
+
+      throw new MockApiError(errorStatus);
+    }
   };
 }
 
 /**
- * @typedef {Object} ErrorSimulationConfig
- * @property {number} probability - Probability of error (0-1)
- * @property {MockError|string} error - Error to return or key from commonErrors
+ * Randomly determine if an error should occur
+ * @param {number} rate - Error rate (0-1)
+ * @returns {boolean} True if error should occur
  */
-
-/**
- * Simulates an error based on probability
- * @param {ErrorSimulationConfig} config - Error simulation configuration
- * @returns {MockError|null} The error if triggered, null otherwise
- * @example
- * const error = simulateError({ probability: 0.1, error: 'internalServer' });
- */
-function simulateError(config) {
-  if (!config || typeof config.probability !== 'number') {
-    return null;
-  }
-
-  if (Math.random() > config.probability) {
-    return null;
-  }
-
-  if (typeof config.error === 'string') {
-    return commonErrors[config.error] || null;
-  }
-
-  return config.error || null;
+function shouldError(rate) {
+  return Math.random() < rate;
 }
 
 /**
- * Gets a common error by name
- * @param {string} name - Error name
- * @returns {MockError|undefined} The error object or undefined
- * @example
- * const notFound = getCommonError('notFound');
+ * Get a random error status from a list
+ * @param {number[]} [statuses=[500]] - List of status codes
+ * @returns {number} Random status code
  */
-function getCommonError(name) {
-  return commonErrors[name];
+function randomErrorStatus(statuses = [500]) {
+  return statuses[Math.floor(Math.random() * statuses.length)];
 }
 
 module.exports = {
-  commonErrors,
-  createError,
-  simulateError,
-  getCommonError
+  HTTP_ERRORS,
+  MockApiError,
+  createErrorSimulator,
+  shouldError,
+  randomErrorStatus,
 };
