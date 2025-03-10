@@ -1,77 +1,169 @@
 /**
- * @fileoverview Configurable response delay utilities
- * @module delay
+ * Delay utilities for simulating network latency
  */
 
-/**
- * Create a delay promise
- * @param {number} ms - Milliseconds to delay
- * @returns {Promise<void>} Promise that resolves after delay
- */
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Calculate delay based on configuration
- * @param {Object} config - Delay configuration
- * @param {number} [config.fixed] - Fixed delay in milliseconds
- * @param {number} [config.min] - Minimum delay for random range
- * @param {number} [config.max] - Maximum delay for random range
- * @returns {number} Calculated delay in milliseconds
- */
-function calculateDelay(config = {}) {
-  if (typeof config === 'number') {
-    return config;
+class DelayController {
+  constructor() {
+    this.defaultDelay = 0;
+    this.delayRange = null;
+    this.pendingDelays = new Set();
+    this.aborted = false;
   }
 
-  if (config.fixed !== undefined) {
-    return config.fixed;
+  /**
+   * Set a fixed delay for all responses
+   */
+  setDelay(ms) {
+    if (typeof ms !== 'number' || ms < 0 || !Number.isFinite(ms)) {
+      throw new Error('Delay must be a non-negative finite number');
+    }
+    this.defaultDelay = ms;
+    this.delayRange = null;
   }
 
-  if (config.min !== undefined && config.max !== undefined) {
-    return Math.floor(Math.random() * (config.max - config.min + 1)) + config.min;
+  /**
+   * Set a random delay range
+   */
+  setDelayRange(min, max) {
+    if (typeof min !== 'number' || typeof max !== 'number') {
+      throw new Error('Delay range values must be numbers');
+    }
+    if (min < 0 || max < 0) {
+      throw new Error('Delay range values must be non-negative');
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      throw new Error('Delay range values must be finite');
+    }
+    if (min > max) {
+      throw new Error('Minimum delay cannot be greater than maximum delay');
+    }
+    this.delayRange = { min, max };
+    this.defaultDelay = 0;
   }
 
-  return 0;
-}
-
-/**
- * Apply delay before executing callback
- * @param {Object} config - Delay configuration
- * @param {Function} callback - Callback to execute after delay
- * @returns {Promise<*>} Result of callback execution
- */
-async function withDelay(config, callback) {
-  const delayMs = calculateDelay(config);
-
-  if (delayMs > 0) {
-    await wait(delayMs);
+  /**
+   * Get the current delay value
+   */
+  getDelay() {
+    if (this.delayRange) {
+      const { min, max } = this.delayRange;
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    return this.defaultDelay;
   }
 
-  return callback();
-}
-
-/**
- * Create a delayed response handler
- * @param {number|Object} delayConfig - Delay configuration
- * @returns {Function} Middleware function that applies delay
- */
-function createDelayMiddleware(delayConfig) {
-  return async (req, res, next) => {
-    const delayMs = calculateDelay(delayConfig);
-
-    if (delayMs > 0) {
-      await wait(delayMs);
+  /**
+   * Apply delay and return a promise
+   */
+  async apply(customDelay = null) {
+    if (this.aborted) {
+      throw new Error('Delay controller has been aborted');
     }
 
-    next();
-  };
+    let delay;
+    if (customDelay !== null) {
+      if (typeof customDelay !== 'number' || customDelay < 0 || !Number.isFinite(customDelay)) {
+        throw new Error('Custom delay must be a non-negative finite number');
+      }
+      delay = customDelay;
+    } else {
+      delay = this.getDelay();
+    }
+
+    if (delay === 0) {
+      return Promise.resolve();
+    }
+
+    const delayPromise = this._createCancellableDelay(delay);
+    return delayPromise;
+  }
+
+  /**
+   * Create a cancellable delay promise
+   */
+  _createCancellableDelay(ms) {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.pendingDelays.delete(timeoutId);
+        if (this.aborted) {
+          reject(new Error('Delay was aborted'));
+        } else {
+          resolve();
+        }
+      }, ms);
+
+      this.pendingDelays.add(timeoutId);
+    });
+  }
+
+  /**
+   * Cancel all pending delays
+   */
+  cancelAll() {
+    for (const timeoutId of this.pendingDelays) {
+      clearTimeout(timeoutId);
+    }
+    this.pendingDelays.clear();
+  }
+
+  /**
+   * Abort the controller - prevents new delays
+   */
+  abort() {
+    this.aborted = true;
+    this.cancelAll();
+  }
+
+  /**
+   * Reset the controller
+   */
+  reset() {
+    this.cancelAll();
+    this.defaultDelay = 0;
+    this.delayRange = null;
+    this.aborted = false;
+  }
+
+  /**
+   * Check if there are pending delays
+   */
+  hasPendingDelays() {
+    return this.pendingDelays.size > 0;
+  }
+
+  /**
+   * Get count of pending delays
+   */
+  getPendingCount() {
+    return this.pendingDelays.size;
+  }
+}
+
+// Singleton instance
+const delayController = new DelayController();
+
+// Convenience functions
+function setDelay(ms) {
+  return delayController.setDelay(ms);
+}
+
+function setDelayRange(min, max) {
+  return delayController.setDelayRange(min, max);
+}
+
+function applyDelay(customDelay = null) {
+  return delayController.apply(customDelay);
+}
+
+function resetDelay() {
+  return delayController.reset();
 }
 
 module.exports = {
-  wait,
-  calculateDelay,
-  withDelay,
-  createDelayMiddleware,
+  DelayController,
+  delayController,
+  setDelay,
+  setDelayRange,
+  applyDelay,
+  resetDelay
 };
